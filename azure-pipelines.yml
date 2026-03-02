@@ -1,0 +1,251 @@
+
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  - name: TF_VERSION
+    value: '1.14.5'
+  - name: TFLINT_VERSION
+    value: '0.53.0'
+  - name: WORKING_DIR
+    value: 'infra'
+  # Backend settings provided by variable group `aws-prod`
+  - group: 'aws-prod'
+  # Domain-specific backend keys
+  - name: TF_BACKEND_KEY_OT
+    value: 'networking/ot-prod/tgw-vpn.tfstate'
+  - name: TF_BACKEND_KEY_IT
+    value: 'networking/it-prod/tgw-vpn.tfstate'
+
+stages:
+- stage: Validate
+  displayName: 'Terraform Validate'
+  jobs:
+  - job: LintAndValidate
+    displayName: 'Lint and validate'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+
+    - script: |
+        set -e
+        echo "Installing Terraform $(TF_VERSION)"
+        curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+        sudo unzip -o terraform.zip -d /usr/local/bin
+        terraform version
+
+        echo "Installing tflint $(TFLINT_VERSION)"
+        curl -fsSL -o tflint.zip https://github.com/terraform-linters/tflint/releases/download/v$(TFLINT_VERSION)/tflint_linux_amd64.zip
+        sudo unzip -o tflint.zip -d /usr/local/bin
+        tflint --version
+      displayName: 'Install Terraform and TFLint'
+
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform fmt -check -recursive
+        export TFLINT_PLUGIN_AWS_REGION="${AWS_DEFAULT_REGION:-$AWS_REGION}"
+        tflint --init
+        tflint -f sarif -o $(Build.ArtifactStagingDirectory)/tflint.sarif .
+      displayName: 'Terraform fmt & TFLint'
+
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform init           -backend-config="bucket=$(TF_BACKEND_BUCKET)"           -backend-config="key=$(TF_BACKEND_KEY_OT)"           -backend-config="region=$(AWS_DEFAULT_REGION)"           -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)"           -input=false
+        terraform validate
+      displayName: 'Terraform init & validate (OT backend)'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/tflint.sarif'
+        artifactName: 'lint'
+        publishLocation: 'Container'
+      displayName: 'Publish lint artifacts'
+
+- stage: Plan
+  displayName: 'Terraform Plan (OT & IT)'
+  dependsOn: Validate
+  jobs:
+  - job: Plan_OT
+    displayName: 'Plan OT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - script: |
+        set -e
+        if ! command -v terraform >/dev/null 2>&1; then
+          curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+          sudo unzip -o terraform.zip -d /usr/local/bin
+        fi
+        terraform version
+      displayName: 'Ensure Terraform available'
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform init           -backend-config="bucket=$(TF_BACKEND_BUCKET)"           -backend-config="key=$(TF_BACKEND_KEY_OT)"           -backend-config="region=$(AWS_DEFAULT_REGION)"           -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)"           -input=false
+
+        terraform plan           -var-file="envs/ot-prod.tfvars"           -out="$(Build.ArtifactStagingDirectory)/plan-ot.tfplan"           -input=false
+
+        terraform show -no-color "$(Build.ArtifactStagingDirectory)/plan-ot.tfplan" > "$(Build.ArtifactStagingDirectory)/plan-ot.txt"
+      displayName: 'Terraform init & plan (OT)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'plan-ot'
+        publishLocation: 'Container'
+      displayName: 'Publish plan artifacts (OT)'
+
+  - job: Plan_IT
+    displayName: 'Plan IT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - script: |
+        set -e
+        if ! command -v terraform >/dev/null 2>&1; then
+          curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+          sudo unzip -o terraform.zip -d /usr/local/bin
+        fi
+        terraform version
+      displayName: 'Ensure Terraform available'
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform init           -backend-config="bucket=$(TF_BACKEND_BUCKET)"           -backend-config="key=$(TF_BACKEND_KEY_IT)"           -backend-config="region=$(AWS_DEFAULT_REGION)"           -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)"           -input=false
+
+        terraform plan           -var-file="envs/it-prod.tfvars"           -out="$(Build.ArtifactStagingDirectory)/plan-it.tfplan"           -input=false
+
+        terraform show -no-color "$(Build.ArtifactStagingDirectory)/plan-it.tfplan" > "$(Build.ArtifactStagingDirectory)/plan-it.txt"
+      displayName: 'Terraform init & plan (IT)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'plan-it'
+        publishLocation: 'Container'
+      displayName: 'Publish plan artifacts (IT)'
+
+- stage: Approval_OT
+  displayName: 'Manual Approval (OT)'
+  dependsOn: Plan
+  jobs:
+  - job: WaitForApprovalOT
+    displayName: 'Manual Validation OT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: ManualValidation@0
+      inputs:
+        instructions: |
+          Review the Terraform plan for OT (plan-ot.txt) and approve to apply to PROD.
+          Domain: OT
+        onTimeout: 'reject'
+        timeout: '43200'
+      displayName: 'Await approval (OT)'
+
+- stage: Apply_OT
+  displayName: 'Terraform Apply (OT)'
+  dependsOn: Approval_OT
+  condition: succeeded()
+  jobs:
+  - job: ApplyOT
+    displayName: 'Apply OT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - task: DownloadBuildArtifacts@1
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'plan-ot'
+        downloadPath: '$(Pipeline.Workspace)'
+      displayName: 'Download plan artifact (OT)'
+    - script: |
+        set -e
+        if ! command -v terraform >/dev/null 2>&1; then
+          curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+          sudo unzip -o terraform.zip -d /usr/local/bin
+        fi
+        terraform version
+      displayName: 'Ensure Terraform available'
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform init           -backend-config="bucket=$(TF_BACKEND_BUCKET)"           -backend-config="key=$(TF_BACKEND_KEY_OT)"           -backend-config="region=$(AWS_DEFAULT_REGION)"           -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)"           -input=false
+
+        terraform apply -input=false "$(Pipeline.Workspace)/plan-ot/plan-ot.tfplan"
+
+        terraform output -json > "$(Build.ArtifactStagingDirectory)/terraform-outputs-ot.json"
+      displayName: 'Terraform init & apply (OT)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'apply-outputs-ot'
+        publishLocation: 'Container'
+      displayName: 'Publish apply artifacts (OT)'
+
+- stage: Approval_IT
+  displayName: 'Manual Approval (IT)'
+  dependsOn: Plan
+  jobs:
+  - job: WaitForApprovalIT
+    displayName: 'Manual Validation IT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: ManualValidation@0
+      inputs:
+        instructions: |
+          Review the Terraform plan for IT (plan-it.txt) and approve to apply to PROD.
+          Domain: IT
+        onTimeout: 'reject'
+        timeout: '43200'
+      displayName: 'Await approval (IT)'
+
+- stage: Apply_IT
+  displayName: 'Terraform Apply (IT)'
+  dependsOn: Approval_IT
+  condition: succeeded()
+  jobs:
+  - job: ApplyIT
+    displayName: 'Apply IT'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - task: DownloadBuildArtifacts@1
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'plan-it'
+        downloadPath: '$(Pipeline.Workspace)'
+      displayName: 'Download plan artifact (IT)'
+    - script: |
+        set -e
+        if ! command -v terraform >/dev/null 2>&1; then
+          curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+          sudo unzip -o terraform.zip -d /usr/local/bin
+        fi
+        terraform version
+      displayName: 'Ensure Terraform available'
+    - script: |
+        set -e
+        cd $(WORKING_DIR)
+        terraform init           -backend-config="bucket=$(TF_BACKEND_BUCKET)"           -backend-config="key=$(TF_BACKEND_KEY_IT)"           -backend-config="region=$(AWS_DEFAULT_REGION)"           -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)"           -input=false
+
+        terraform apply -input=false "$(Pipeline.Workspace)/plan-it/plan-it.tfplan"
+
+        terraform output -json > "$(Build.ArtifactStagingDirectory)/terraform-outputs-it.json"
+      displayName: 'Terraform init & apply (IT)'
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'apply-outputs-it'
+        publishLocation: 'Container'
+      displayName: 'Publish apply artifacts (IT)'
