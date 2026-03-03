@@ -6,6 +6,7 @@ variable "env"        { type = string  default = "prod" }
 variable "ot_vpc_id"         { type = string }
 variable "ot_tgw_subnet_ids" { type = list(string) }
 variable "ot_tgw_id"         { type = string }
+variable "ot_tgw_asn"        { type = number }
 variable "ot_cgw_public_ips" { type = list(string) }
 variable "ot_vpn_tunnel_inside_cidrs" {
   type    = list(string)
@@ -16,6 +17,7 @@ variable "ot_vpn_tunnel_inside_cidrs" {
 variable "it_vpc_id"         { type = string }
 variable "it_tgw_subnet_ids" { type = list(string) }
 variable "it_tgw_id"         { type = string }
+variable "it_tgw_asn"        { type = number }
 variable "it_cgw_public_ips" { type = list(string) }
 variable "it_vpn_tunnel_inside_cidrs" {
   type    = list(string)
@@ -23,8 +25,7 @@ variable "it_vpn_tunnel_inside_cidrs" {
 }
 
 # Common Configuration
-variable "tgw_asn"        { type = number default = 64512 }
-variable "cgw_bgp_asn"    { type = number default = 65515 }
+variable "cgw_bgp_asn"    { type = number default = 2009 }
 
 variable "tgw_default_route_table_association" { type = bool default = false }
 variable "tgw_default_route_table_propagation" { type = bool default = false }

@@ -7,11 +7,11 @@ domain     = "OT"
 create_tgw      = false
 existing_tgw_id = "tgw-046432679404c0c8e" # TODO: replace with actual OT TGW ID
 
-vpc_id         = "vpc-0abcde123456789ab" # TODO: replace with real OT VPC ID
+vpc_id         = "vpc-08d937b89707ea8ac" # TODO: replace with real OT VPC ID
 tgw_subnet_ids = [
-  "subnet-0aaa1111aaa1111aa", # OT private TGW subnet AZ1
-  "subnet-0bbb2222bbb2222bb", # OT private TGW subnet AZ2
-  "subnet-0ccc3333ccc3333cc"  # OT private TGW subnet AZ3
+  "subnet-0ba3462654aaafb54", # OT private TGW subnet AZ1
+  "subnet-0fd76b1d3f1bc7523", # OT private TGW subnet AZ2
+  "subnet-072adb60a59888568"  # OT private TGW subnet AZ3
 ]
 
 tgw_asn = 64513

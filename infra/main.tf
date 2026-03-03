@@ -16,7 +16,7 @@ module "ot_vpn" {
 
   create_tgw      = false
   existing_tgw_id = var.ot_tgw_id
-  tgw_asn         = var.tgw_asn
+  tgw_asn         = var.ot_tgw_asn
 
   cgw_public_ips = var.ot_cgw_public_ips
   cgw_bgp_asn    = var.cgw_bgp_asn
@@ -45,7 +45,7 @@ module "it_vpn" {
 
   create_tgw      = false
   existing_tgw_id = var.it_tgw_id
-  tgw_asn         = var.tgw_asn
+  tgw_asn         = var.it_tgw_asn
 
   cgw_public_ips = var.it_cgw_public_ips
   cgw_bgp_asn    = var.cgw_bgp_asn

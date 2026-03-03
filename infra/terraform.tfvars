@@ -3,28 +3,29 @@ aws_region = "eu-west-2"
 env        = "prod"
 
 # OT Configuration
-ot_vpc_id = "vpc-xxxxxxxxxxxxxxxxx" # TODO: replace with OT VPC ID
+ot_vpc_id = "vpc-08d937b89707ea8ac"
 ot_tgw_subnet_ids = [
-  "subnet-ot-az1-xxxxxxxxxxxxx", # OT TGW subnet AZ1
-  "subnet-ot-az2-xxxxxxxxxxxxx", # OT TGW subnet AZ2
-  "subnet-ot-az3-xxxxxxxxxxxxx"  # OT TGW subnet AZ3
+  "subnet-0ba3462654aaafb54", # OT TGW subnet AZ1
+  "subnet-0fd76b1d3f1bc7523", # OT TGW subnet AZ2
+  "subnet-072adb60a59888568"  # OT TGW subnet AZ3
 ]
-ot_tgw_id         = "tgw-xxxxxxxxxxxxxxxxx" # TODO: replace with OT TGW ID
-ot_cgw_public_ips = ["52.12.34.56"]         # TODO: replace with OT Azure VPN GW public IP
+ot_tgw_id         = "tgw-046432679404c0c8e"
+ot_tgw_asn        = 64513
+ot_cgw_public_ips = ["4.159.61.37"]
 
 # IT Configuration
-it_vpc_id = "vpc-xxxxxxxxxxxxxxxxx" # TODO: replace with IT VPC ID
+it_vpc_id = "vpc-0f88c9baaa557c312"
 it_tgw_subnet_ids = [
-  "subnet-it-az1-xxxxxxxxxxxxx", # IT TGW subnet AZ1
-  "subnet-it-az2-xxxxxxxxxxxxx", # IT TGW subnet AZ2
-  "subnet-it-az3-xxxxxxxxxxxxx"  # IT TGW subnet AZ3
+  "subnet-0c51accf898302ac3", # IT TGW subnet AZ1
+  "subnet-0d601cef22549f2e6", # IT TGW subnet AZ2
+  "subnet-0e014cbeae438f221"  # IT TGW subnet AZ3
 ]
-it_tgw_id         = "tgw-xxxxxxxxxxxxxxxxx" # TODO: replace with IT TGW ID
-it_cgw_public_ips = ["203.0.113.10"]        # TODO: replace with IT Azure VPN GW public IP
+it_tgw_id         = "tgw-0197ed40c5a15e3dd"
+it_tgw_asn        = 64512
+it_cgw_public_ips = ["52.169.226.10"]
 
 # Common Configuration
-tgw_asn     = 64512
-cgw_bgp_asn = 65515
+cgw_bgp_asn = 2009
 
 tags = {
   project = "s2s"

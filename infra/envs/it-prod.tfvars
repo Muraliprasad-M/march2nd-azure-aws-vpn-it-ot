@@ -10,11 +10,11 @@ existing_tgw_id = "tgw-0197ed40c5a15e3dd" # TODO: replace with actual IT TGW ID
 # IT VPC and three TGW attachment private subnets (one per AZ)
 # Names from request for reference:
 #  Subnet1-it-tgw-AZ1, Subnet2-it-tgw-AZ2, Subnet3-it-tgw-AZ3
-vpc_id         = "vpc-it-xxxxxxxxxxxxxxxxx"           # TODO: replace with real IT VPC ID
+vpc_id         = "vpc-0f88c9baaa557c312"           # TODO: replace with real IT VPC ID
 tgw_subnet_ids = [
-  "subnet-it-az1-xxxxxxxxxxxxx", # Subnet1-it-tgw-AZ1 (replace with real subnet ID)
-  "subnet-it-az2-xxxxxxxxxxxxx", # Subnet2-it-tgw-AZ2 (replace with real subnet ID)
-  "subnet-it-az3-xxxxxxxxxxxxx"  # Subnet3-it-tgw-AZ3 (replace with real subnet ID)
+  "subnet-0c51accf898302ac3", # Subnet1-it-tgw-AZ1 (replace with real subnet ID)
+  "subnet-0d601cef22549f2e6", # Subnet2-it-tgw-AZ2 (replace with real subnet ID)
+  "subnet-0e014cbeae438f221"  # Subnet3-it-tgw-AZ3 (replace with real subnet ID)
 ]
 
 tgw_asn = 64512
