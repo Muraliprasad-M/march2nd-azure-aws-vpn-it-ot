@@ -2,7 +2,7 @@
 aws_region = "eu-west-2"
 env        = "prod"
 
-# OT Configuration
+# OT Configuration - 2 VPNs to Azure
 ot_vpc_id = "vpc-08d937b89707ea8ac"
 ot_tgw_subnet_ids = [
   "subnet-0ba3462654aaafb54", # OT TGW subnet AZ1
@@ -11,7 +11,10 @@ ot_tgw_subnet_ids = [
 ]
 ot_tgw_id         = "tgw-046432679404c0c8e"
 ot_tgw_asn        = 64513
-ot_cgw_public_ips = ["4.159.61.37"]
+ot_cgw_public_ips = [
+  "4.159.61.37",    # ot-network-ss-vpn-azgw1 (ot-network-hub-uks-vpn-vnetgw)
+  "40.127.209.247"  # ot-network-ss-vpn-azgw2 (ot-network-ss-neu-vpn-vnetgw)
+]
 
 # IT Configuration
 it_vpc_id = "vpc-0f88c9baaa557c312"
