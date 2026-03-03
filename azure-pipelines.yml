@@ -42,111 +42,44 @@ stages:
       steps:
         - template: stages/code-validation-stage.yml@templates
 
+# ==========================================
+# TERRAFORM PLAN STAGE
+# ==========================================
 - stage: Plan
-  displayName: 'Terraform Plan (OT & IT)'
+  displayName: 'Terraform Plan'
   dependsOn: Validate
-  jobs:
-  - job: Plan
-    displayName: 'Plan OT & IT'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - checkout: self
-    
-    - script: |
-        set -e
-        curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
-        sudo unzip -o terraform.zip -d /usr/local/bin
-        terraform version
-      displayName: 'Install Terraform'
-    
-    - script: |
-        set -e
-        cd $(WORKING_DIR)
-        terraform init \
-          -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
-          -backend-config="key=$(TF_BACKEND_KEY)" \
-          -backend-config="region=$(AWS_DEFAULT_REGION)" \
-          -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)" \
-          -input=false
-
-        terraform plan \
-          -out="$(Build.ArtifactStagingDirectory)/plan.tfplan" \
-          -input=false
-
-        terraform show -no-color "$(Build.ArtifactStagingDirectory)/plan.tfplan" > "$(Build.ArtifactStagingDirectory)/plan.txt"
-      displayName: 'Terraform init & plan'
-    
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-        artifactName: 'plan'
-        publishLocation: 'Container'
-      displayName: 'Publish plan artifacts'
-
-- stage: Approval
-  displayName: 'Manual Approval'
-  dependsOn: Plan
-  jobs:
-  - job: WaitForApproval
-    displayName: 'Manual Validation'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - task: ManualValidation@0
-      inputs:
-        instructions: |
-          Review the Terraform plan (plan.txt) and approve to apply to PROD.
-          This will deploy both OT and IT VPN connections.
-        onTimeout: 'reject'
-        timeout: '43200'
-      displayName: 'Await approval'
-
-- stage: Apply
-  displayName: 'Terraform Apply (OT & IT)'
-  dependsOn: Approval
   condition: succeeded()
   jobs:
-  - job: Apply
-    displayName: 'Apply OT & IT'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - checkout: self
-    
-    - task: DownloadBuildArtifacts@1
-      inputs:
-        buildType: 'current'
-        downloadType: 'single'
-        artifactName: 'plan'
-        downloadPath: '$(Pipeline.Workspace)'
-      displayName: 'Download plan artifact'
-    
-    - script: |
-        set -e
-        curl -fsSL -o terraform.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
-        sudo unzip -o terraform.zip -d /usr/local/bin
-        terraform version
-      displayName: 'Install Terraform'
-    
-    - script: |
-        set -e
-        cd $(WORKING_DIR)
-        terraform init \
-          -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
-          -backend-config="key=$(TF_BACKEND_KEY)" \
-          -backend-config="region=$(AWS_DEFAULT_REGION)" \
-          -backend-config="dynamodb_table=$(TF_BACKEND_DDB_TABLE)" \
-          -input=false
+    - job: TerraformPlan
+      steps:
+        - template: stages/terraform-plan-stage.yml@templates
+          parameters:
+            tfStateBucket: 'st-network-prod-euw2-tfstate-eyqwgt'
+            tfStateKey: 'core-network/terraform.tfstate'
+            tfStateLock: 'st-network-prod-euw2-tfstate-lock'
+            awsServiceConnection: 'aws-core-network'
+            roleArn: 'arn:aws:iam::732822664028:role/TerraformExecutionRole'
 
-        terraform apply -input=false "$(Pipeline.Workspace)/plan/plan.tfplan"
-
-        terraform output -json > "$(Build.ArtifactStagingDirectory)/terraform-outputs.json"
-      displayName: 'Terraform init & apply'
-    
-    - task: PublishBuildArtifacts@1
-      inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-        artifactName: 'apply-outputs'
-        publishLocation: 'Container'
-      displayName: 'Publish apply artifacts'
+# ==========================================
+# TERRAFORM APPLY STAGE
+# ==========================================
+- stage: Apply
+  displayName: 'Terraform Apply'
+  dependsOn: Plan
+  jobs:
+    - deployment: ApplyDeployment
+      displayName: "Run terraform apply"
+      environment: 'ManualApply'
+      condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+              - template: stages/terraform-apply-stage.yml@templates
+                parameters:
+                  tfStateBucket: 'st-network-prod-euw2-tfstate-eyqwgt'
+                  tfStateKey: 'core-network/terraform.tfstate'
+                  tfStateLock: 'st-network-prod-euw2-tfstate-lock'
+                  awsServiceConnection: 'aws-core-network'
+                  roleArn: 'arn:aws:iam::732822664028:role/TerraformExecutionRole'
